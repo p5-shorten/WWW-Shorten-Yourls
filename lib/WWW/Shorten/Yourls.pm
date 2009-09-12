@@ -170,13 +170,13 @@ THIS IS NOT WORKING RIGHT NOW AS YOURLS DOESN'T SUPPORT EXPANDING A URL.
 sub makealongerlink #($,%)
 {
     my $url = shift or croak('No shortened yourls.org URL passed to makealongerlink');
-    my ($user, $password) = @_ or croak('No username or password passed to makealongerlink');
+    my ($user, $password, $base) = @_ or croak('No username, password, or base passed to makealongerlink');
     my $ua = __PACKAGE__->ua();
     my $yourls;
     my @foo = split(/\//, $url);
     $yourls->{json} = JSON::Any->new;
     $yourls->{xml} = new XML::Simple(SuppressEmpty => 1);
-    $yourls->{response} = $ua->post($self->{BASE} . '/expand', [
+    $yourls->{response} = $ua->post($base . '/expand', [
         'shortUrl' => $url,
         'login' => $user,
         'password' => $password,
@@ -233,17 +233,17 @@ THIS IS NOT WORKING RIGHT NOW AS YOURLS DOESN'T SUPPORT EXPANDING A URL.
 sub expand {
     my $self = shift;
     my %args = @_;
-    if (!defined $args{URL}) {
-        croak("URL is required.\n");
+    if (!defined $args{URL} || !defined $args{base} ) {
+        croak("URL and base are required.\n");
         return -1;
     }
     my @foo = split(/\//, $args{URL});
-    $self->{response} = $self->{browser}->get($self->{BASE} . '/expand', [
+    $self->{response} = $self->{browser}->get($args{base} . '/expand', [
         'shortUrl' => $args{URL},
         'username' => $self->{USER},
         'password' => $self->{PASSWORD},
     ]);
-    $Self->{response}->is_success || die 'Failed to get yourls.org link: ' . $self->{response}->status_line;
+    $self->{response}->is_success || die 'Failed to get yourls.org link: ' . $self->{response}->status_line;
     return undef if ( $self->{json}->jsonToObj($self->{response}->{_content})->{errorCode} != 0 );
     $self->{longurl} = $self->{json}->jsonToObj($self->{response}->{_content})->{results}->{$foo[3]}->{longUrl};
     return $self->{longurl} if ( $self->{json}->jsonToObj($self->{response}->{_content})->{errorCode} == 0 );
