@@ -26,12 +26,12 @@ WWW::Shorten::Yourls - Interface to shortening URLs using L<http://yourls.org>
 
 =head1 VERSION
 
-$Revision: 156 $
+$Revision: 0.01 $
 
 =cut
 
 BEGIN {
-    our $VERSION = do { my @r = (q$Revision: 156 $ =~ /\d+/g); sprintf "%1d."."%02d" x $#r, @r }; # must be all one line, for MakeMaker
+    our $VERSION = do { my @r = (q$Revision: 0.01 $ =~ /\d+/g); sprintf "%1d."."%02d" x $#r, @r }; # must be all one line, for MakeMaker
     $WWW::Shorten::Yourls::VERBOSITY = 2;
 }
 
@@ -49,16 +49,15 @@ use WWW::Shorten::Yourls;
 
 my $url = "http://www.example.com";
 
-my $tmp = makeashorterlink($url, 'MY_YOURLS_USERNAME', 'MY_YOURLS_API_KEY');
-my $tmp1 = makealongerlink($tmp, 'MY_YOURLS_USERNAME', 'MY_YOURLS_API_KEY');
+my $tmp = makeashorterlink($url, 'MY_YOURLS_USERNAME', 'MY_YOURLS_PASSWORD');
+my $tmp1 = makealongerlink($tmp, 'MY_YOURLS_USERNAME', 'MY_YOURLS_PASSWORD');
 
 or
 
 use WWW::Shorten::Yourls;
 
 my $url = "http://www.example.com";
-my $yourls = WWW::Shorten::Yourls->new(URL => $url,
-USER => "my_user_id",
+my $yourls = WWW::Shorten::Yourls->new(USER => "my_user_id",
 APIKEY => "my_api_key");
 
 $yourls->shorten(URL => $url);
@@ -66,15 +65,6 @@ print "shortened URL is $yourls->{url}\n";
 
 $yourls->expand(URL => $yourls->{url});
 print "expanded/original URL is $yourls->{longurl}\n";
-
-my $info = $yourls->info();
-say "City referred to is " . $info->{calais}->{city}->{item};
-say "Companies referred to are " . $info->{calais}->{company}->{item}[0] . "and " . $info->{calais}->{company}->{item}[1];
-say "Title of the page is " . $info->{htmlTitle};
-
-my $clicks = $yourls->clicks();
-say "Total number of clicks received: " . $clicks->{clicks};
-say "Total number of direct clicks received are: " . ${$clicks->{referrers}->{nodeKeyVal}[0]}->{direct}
 
 =head1 FUNCTIONS
 
@@ -84,7 +74,7 @@ Create a new yourls.org object using your yourls.org user id and yourls.org api 
 
 my $yourls = WWW::Shorten::Yourls->new(URL => "http://www.example.com/this_is_one_example.html",
 USER => "yourls_user_id",
-APIKEY => "yourls_api_key");
+PASSWORD => "yourls_password");
 
 =cut
 
@@ -115,6 +105,10 @@ sub new {
     $yourls->{xml} = new XML::Simple(SuppressEmpty => 1);
     my ($self) = $yourls;
     bless $self, $class;
+    if (defined $args{URL}) {
+        $self->shorten(URL => $args{URL});
+        return $self->{url};
+    }
 }
 
 
@@ -123,7 +117,9 @@ sub new {
 The function C<makeashorterlink> will call the yourls.org API site passing it
 your long URL and will return the shorter yourls.org version.
 
-yourls.org requires the use of a user id and API key to shorten links.
+yourls.org requires the use of a user id and password to shorten links.
+
+makeashorterlink($url,$uid,$passwd,$base);
 
 =cut
 
@@ -149,9 +145,8 @@ sub makeashorterlink #($;%)
         'password' => $password,
     ]);
     $yourls->{response}->is_success || die 'Failed to get yourls.org link: ' . $yourls->{response}->status_line;
-    $yourls->{url} = $yourls->{json}->jsonToObj($yourls->{response}->{_content})->{results}->{$url}->{shortUrl};
-    return unless $yourls->{response}->is_success;
-    return $yourls->{url};
+    $yourls->{url} = $yourls->{json}->jsonToObj($yourls->{response}->{_content})->{shorturl};
+    return $yourls->{url} if ( $yourls->{json}->jsonToObj($yourls->{response}->{_content})->{status} eq 'success' || ($yourls->{json}->jsonToObj($yourls->{response}->{_content})->{status} eq 'fail' && $yourls->{json}->jsonToObj($yourls->{response}->{_content})->{code} eq 'error:url'));
 }
 
 =head2 makealongerlink
@@ -162,6 +157,8 @@ yourls.org identifier. yourls.org requires the use of a user name and API
 Key when using the API.
 
 If anything goes wrong, then the function will return C<undef>.
+
+makealongerlink($url,$uid,$passwd,$base);
 
 THIS IS NOT WORKING RIGHT NOW AS YOURLS DOESN'T SUPPORT EXPANDING A URL.
 
@@ -177,15 +174,16 @@ sub makealongerlink #($,%)
     $yourls->{json} = JSON::Any->new;
     $yourls->{xml} = new XML::Simple(SuppressEmpty => 1);
     $yourls->{response} = $ua->post($base . '/expand', [
-        'shortUrl' => $url,
-        'login' => $user,
+        'url' => $url,
+#        'keyword' => $keyword,
+        'format' => 'json',
+        'action' => 'expand',
+        'username' => $user,
         'password' => $password,
     ]);
     $yourls->{response}->is_success || die 'Failed to get yourls.org link: ' . $yourls->{response}->status_line;
-    $yourls->{longurl} = $yourls->{json}->jsonToObj($yourls->{response}->{_content})->{results}->{$foo[3]}->{longUrl};
-    return undef unless $yourls->{response}->is_success;
-    my $content = $yourls->{response}->content;
-    return $yourls->{longurl};
+    $yourls->{longurl} = $yourls->{json}->jsonToObj($yourls->{response}->{_content})->{shorturl};
+    return $yourls->{longurl} if ( $yourls->{json}->jsonToObj($yourls->{response}->{_content})->{status} eq 'success' || ($yourls->{json}->jsonToObj($yourls->{response}->{_content})->{status} eq 'fail' && $yourls->{json}->jsonToObj($yourls->{response}->{_content})->{code} eq 'error:url'));
 }
 
 =head2 shorten
@@ -209,6 +207,7 @@ sub shorten {
         croak("URL is required.\n");
         return -1;
     }
+    $args{format} ||= 'json';
     $self->{response} = $self->{browser}->post($self->{BASE} . '/yourls-api.php', [
         'url' => $args{URL},
 #        'keyword' => $args{keyword},
@@ -218,7 +217,6 @@ sub shorten {
         'password' => $self->{PASSWORD},
     ]);
     $self->{response}->is_success || die 'Failed to get yourls.org link: ' . $self->{response}->status_line;
-#    return undef if ( $self->{json}->jsonToObj($self->{response}->{_content})->{status} =~ /fail/ );
     $self->{url} = $self->{json}->jsonToObj($self->{response}->{_content})->{shorturl};
     return $self->{url} if ( $self->{json}->jsonToObj($self->{response}->{_content})->{status} eq 'success' || ($self->{json}->jsonToObj($self->{response}->{_content})->{status} eq 'fail' && $self->{json}->jsonToObj($self->{response}->{_content})->{code} eq 'error:url'));
 }
@@ -227,7 +225,9 @@ sub shorten {
 
 Expands a shortened yourls.org URL to the original long URL.
 
-THIS IS NOT WORKING RIGHT NOW AS YOURLS DOESN'T SUPPORT EXPANDING A URL.
+THIS IS NOT WORKING RIGHT NOW AS YOURLS < 1.4 DOESN'T SUPPORT EXPANDING A URL
+
+1.4 hasn't been released yet.
 
 =cut
 sub expand {
@@ -237,29 +237,26 @@ sub expand {
         croak("URL and base are required.\n");
         return -1;
     }
+    $args{format} ||= 'json';
     my @foo = split(/\//, $args{URL});
     $self->{response} = $self->{browser}->get($args{base} . '/expand', [
-        'shortUrl' => $args{URL},
+        'shorturl' => $args{URL},
+        'action'   => 'expand'
         'username' => $self->{USER},
         'password' => $self->{PASSWORD},
+        'format'   => $args{format}
     ]);
     $self->{response}->is_success || die 'Failed to get yourls.org link: ' . $self->{response}->status_line;
-    return undef if ( $self->{json}->jsonToObj($self->{response}->{_content})->{errorCode} != 0 );
-    $self->{longurl} = $self->{json}->jsonToObj($self->{response}->{_content})->{results}->{$foo[3]}->{longUrl};
-    return $self->{longurl} if ( $self->{json}->jsonToObj($self->{response}->{_content})->{errorCode} == 0 );
+    $self->{response}->is_success || die 'Failed to get yourls.org link: ' . $self->{response}->status_line;
+    $self->{urllong} = $self->{json}->jsonToObj($self->{response}->{_content})->{longurl};
+    return $self->{urllong} if ( $self->{json}->jsonToObj($self->{response}->{_content})->{status} eq 'success' || ($self->{json}->jsonToObj($self->{response}->{_content})->{status} eq 'fail' && $self->{json}->jsonToObj($self->{response}->{_content})->{code} eq 'error:url'));
 }
 
 =head2 clicks
 
 Get click thru information for a shortened yourls.org URL. By default, the method will use the value that's stored in $yourls->{url}. To be sure you're getting info on the correct URL, it's a good idea to set this value before getting any info on it.
 
-$yourls->{url} = "http://yourls.org/jmv6";
-my $clicks = $yourls->clicks();
-
-say "Total number of clicks received: " . $clicks->{clicks};
-say "Total number of direct clicks received are: " . ${$clicks->{referrers}->{nodeKeyVal}[0]}->{direct}
-
-THIS HAS NOT BEEN IMPLEMENTED YET.
+THIS HAS NOT BEEN IMPLEMENTED YET AS YOURLS DOESN'T SUPPORT THIS FUNCTIONALITY.
 
 =cut
 
@@ -375,10 +372,9 @@ L<http://search.cpan.org/dist/WWW-Shorten-Yourls/>
 
 =item http://yourls.org for a great tool.
 
-=item Larry Wall, Damian Conway, and all the amazing folks giving us Perl and
-continuing to work on it over the years.
-=item Mizar, C<< <mizar.jp@gmail.com> >>, Peter Edwards, C<<pedwards@cpan.org> >>, Joerg Meltzer, C<< <joerg@joergmeltzer.de> >> for great patches.
+=item Larry Wall, Damian Conway, and all the amazing folks giving us Perl and continuing to work on it over the years.
 
+=item Mizar, C<< <mizar.jp@gmail.com> >>, Peter Edwards, C<<pedwards@cpan.org> >>, Joerg Meltzer, C<< <joerg@joergmeltzer.de> >> for great patches to WWW::Shorten:Bitly which this module is based on.
 
 =back
 
@@ -388,8 +384,7 @@ continuing to work on it over the years.
 
 =item Copyright (c) 2009 Pankaj Jain, All Rights Reserved L<http://blog.linosx.com>.
 
-=item Copyright (c) 2009 Teknatus Solutions LLC, All Rights Reserved
-L<http://www.teknatus.com>.
+=item Copyright (c) 2009 Teknatus Solutions LLC, All Rights Reserved L<http://www.teknatus.com>.
 
 =back
 
