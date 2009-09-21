@@ -241,7 +241,7 @@ sub expand {
     my @foo = split(/\//, $args{URL});
     $self->{response} = $self->{browser}->get($args{base} . '/expand', [
         'shorturl' => $args{URL},
-        'action'   => 'expand'
+        'action'   => 'expand',
         'username' => $self->{USER},
         'password' => $self->{PASSWORD},
         'format'   => $args{format}
