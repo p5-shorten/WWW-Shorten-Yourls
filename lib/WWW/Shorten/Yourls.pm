@@ -31,7 +31,7 @@ $Revision: 0.02 $
 =cut
 
 BEGIN {
-    our $VERSION = do { my @r = (q$Revision: 0.01 $ =~ /\d+/g); sprintf "%1d."."%02d" x $#r, @r }; # must be all one line, for MakeMaker
+    our $VERSION = do { my @r = (q$Revision: 0.02 $ =~ /\d+/g); sprintf "%1d."."%02d" x $#r, @r }; # must be all one line, for MakeMaker
     $WWW::Shorten::Yourls::VERBOSITY = 2;
 }
 
