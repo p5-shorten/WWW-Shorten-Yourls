@@ -26,7 +26,7 @@ WWW::Shorten::Yourls - Interface to shortening URLs using L<http://yourls.org>
 
 =head1 VERSION
 
-$Revision: 0.01 $
+$Revision: 0.02 $
 
 =cut
 
@@ -105,10 +105,10 @@ sub new {
     $yourls->{xml} = new XML::Simple(SuppressEmpty => 1);
     my ($self) = $yourls;
     bless $self, $class;
-    if (defined $args{URL}) {
-        $self->shorten(URL => $args{URL});
-        return $self->{url};
-    }
+#    if (defined $args{URL}) {
+#        $self->shorten(URL => $args{URL});
+#        return $self->{url};
+#    }
 }
 
 
@@ -145,8 +145,8 @@ sub makeashorterlink #($;%)
         'password' => $password,
     ]);
     $yourls->{response}->is_success || die 'Failed to get yourls.org link: ' . $yourls->{response}->status_line;
-    $yourls->{url} = $yourls->{json}->jsonToObj($yourls->{response}->{_content})->{shorturl};
-    return $yourls->{url} if ( $yourls->{json}->jsonToObj($yourls->{response}->{_content})->{status} eq 'success' || ($yourls->{json}->jsonToObj($yourls->{response}->{_content})->{status} eq 'fail' && $yourls->{json}->jsonToObj($yourls->{response}->{_content})->{code} eq 'error:url'));
+    $yourls->{url} = $yourls->{json}->jsonToObj($yourls->{response}->{_content})->{shorturl} if (defined $yourls->{json}->jsonToObj($yourls->{response}->{_content})->{statusCode} && $yourls->{json}->jsonToObj($yourls->{response}->{_content})->{statusCode} == 200);
+    return $yourls->{url};
 }
 
 =head2 makealongerlink
@@ -169,12 +169,12 @@ sub makealongerlink #($,%)
     my $url = shift or croak('No shortened yourls.org URL passed to makealongerlink');
     my ($user, $password, $base) = @_ or croak('No username, password, or base passed to makealongerlink');
     my $ua = __PACKAGE__->ua();
+    my $yurl = $base . "/yourls-api.php";
     my $yourls;
-    my @foo = split(/\//, $url);
     $yourls->{json} = JSON::Any->new;
     $yourls->{xml} = new XML::Simple(SuppressEmpty => 1);
-    $yourls->{response} = $ua->post($base . '/expand', [
-        'url' => $url,
+    $yourls->{response} = $ua->post($yurl, [
+        'shorturl' => $url,
 #        'keyword' => $keyword,
         'format' => 'json',
         'action' => 'expand',
@@ -182,8 +182,8 @@ sub makealongerlink #($,%)
         'password' => $password,
     ]);
     $yourls->{response}->is_success || die 'Failed to get yourls.org link: ' . $yourls->{response}->status_line;
-    $yourls->{longurl} = $yourls->{json}->jsonToObj($yourls->{response}->{_content})->{shorturl};
-    return $yourls->{longurl} if ( $yourls->{json}->jsonToObj($yourls->{response}->{_content})->{status} eq 'success' || ($yourls->{json}->jsonToObj($yourls->{response}->{_content})->{status} eq 'fail' && $yourls->{json}->jsonToObj($yourls->{response}->{_content})->{code} eq 'error:url'));
+    $yourls->{longurl} = $yourls->{json}->jsonToObj($yourls->{response}->{_content})->{longurl} if (defined $yourls->{json}->jsonToObj($yourls->{response}->{_content})->{statusCode} && $yourls->{json}->jsonToObj($yourls->{response}->{_content})->{statusCode} == 200);
+    return $yourls->{longurl};
 }
 
 =head2 shorten
@@ -217,29 +217,28 @@ sub shorten {
         'password' => $self->{PASSWORD},
     ]);
     $self->{response}->is_success || die 'Failed to get yourls.org link: ' . $self->{response}->status_line;
-    $self->{url} = $self->{json}->jsonToObj($self->{response}->{_content})->{shorturl};
-    return $self->{url} if ( $self->{json}->jsonToObj($self->{response}->{_content})->{status} eq 'success' || ($self->{json}->jsonToObj($self->{response}->{_content})->{status} eq 'fail' && $self->{json}->jsonToObj($self->{response}->{_content})->{code} eq 'error:url'));
+    $self->{url} = $self->{json}->jsonToObj($self->{response}->{_content})->{shorturl} if (defined $self->{json}->jsonToObj($self->{response}->{_content})->{statusCode} && $self->{json}->jsonToObj($self->{response}->{_content})->{statusCode} == 200);
+    return $self->{url}
 }
 
 =head2 expand
 
 Expands a shortened yourls.org URL to the original long URL.
 
-THIS IS NOT WORKING RIGHT NOW AS YOURLS < 1.4 DOESN'T SUPPORT EXPANDING A URL
-
-1.4 hasn't been released yet.
+THIS ONLY WORKS WITH YOURLS 1.4+
+Versions prior to Yourls 1.4 don't support expansion of shortened URLs.
 
 =cut
 sub expand {
     my $self = shift;
     my %args = @_;
-    if (!defined $args{URL} || !defined $args{base} ) {
-        croak("URL and base are required.\n");
+    $args{URL} ||= $self->{url};
+    if (!defined $args{URL}) {
+        croak("URL is required.\n");
         return -1;
     }
     $args{format} ||= 'json';
-    my @foo = split(/\//, $args{URL});
-    $self->{response} = $self->{browser}->get($args{base} . '/expand', [
+    $self->{response} = $self->{browser}->post($self->{BASE} . '/yourls-api.php', [
         'shorturl' => $args{URL},
         'action'   => 'expand',
         'username' => $self->{USER},
@@ -247,9 +246,8 @@ sub expand {
         'format'   => $args{format}
     ]);
     $self->{response}->is_success || die 'Failed to get yourls.org link: ' . $self->{response}->status_line;
-    $self->{response}->is_success || die 'Failed to get yourls.org link: ' . $self->{response}->status_line;
-    $self->{urllong} = $self->{json}->jsonToObj($self->{response}->{_content})->{longurl};
-    return $self->{urllong} if ( $self->{json}->jsonToObj($self->{response}->{_content})->{status} eq 'success' || ($self->{json}->jsonToObj($self->{response}->{_content})->{status} eq 'fail' && $self->{json}->jsonToObj($self->{response}->{_content})->{code} eq 'error:url'));
+    $self->{longurl} = $self->{json}->jsonToObj($self->{response}->{_content})->{longurl} if (defined $self->{json}->jsonToObj($self->{response}->{_content})->{statusCode} && $self->{json}->jsonToObj($self->{response}->{_content})->{statusCode} == 200);
+    return $self->{longurl};
 }
 
 =head2 clicks
