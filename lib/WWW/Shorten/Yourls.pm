@@ -26,12 +26,12 @@ WWW::Shorten::Yourls - Interface to shortening URLs using L<http://yourls.org>
 
 =head1 VERSION
 
-$Revision: 0.04 $
+$Revision: 0.05 $
 
 =cut
 
 BEGIN {
-    our $VERSION = do { my @r = (q$Revision: 0.04 $ =~ /\d+/g); sprintf "%1d."."%02d" x $#r, @r }; # must be all one line, for MakeMaker
+    our $VERSION = do { my @r = (q$Revision: 0.05 $ =~ /\d+/g); sprintf "%1d."."%02d" x $#r, @r }; # must be all one line, for MakeMaker
     $WWW::Shorten::Yourls::VERBOSITY = 2;
 }
 
@@ -93,7 +93,7 @@ sub new {
         }
         close $fh;
     }
-    if (((!defined $args{USER} || !defined $args{PASSWORD}) && !defined $args{SIGNATURE} ) || !defined $args{BASE}) {
+    if (((!$args{USER} || !$args{PASSWORD}) && !$args{SIGNATURE}) || !$args{BASE}) {
         carp("USER and PASSWORD or SIGNATURE and BASE are required parameters.\n");
         return -1;
     }
@@ -275,29 +275,26 @@ THIS HAS NOT BEEN IMPLEMENTED YET AS YOURLS DOESN'T SUPPORT THIS FUNCTIONALITY.
 
 sub clicks {
     my $self = shift;
+    my %args = @_;
+    $args{URL} ||= $self->{url};
+    if (!defined $args{URL}) {
+        croak("URL is required.\n");
+        return -1;
+    }
     if (!$self->{SIGNATURE}) {
-        $self->{response} = $self->{browser}->post($self->{BASE} . '/stats', [
-            'format' => 'json',
-            'shortUrl' => $self->{url},
+        $self->{response} = $self->{browser}->post($self->{BASE} . '/yourls-api.php', [
+            'action'   => 'url-stats',
+            'format'   => 'json',
+            'shorturl' => $args{URL},
             'username' => $self->{USER},
             'password' => $self->{PASSWORD},
         ]);
     } else {
-        $self->{response} = $self->{browser}->post($self->{BASE} . '/stats', [
-            'format' => 'json',
-            'shortUrl' => $self->{url},
-            'signature' => $self->{SIGNATURE},
-        ]);
+        $self->{response} = $self->{browser}->get($self->{BASE} . '/yourls-api.php?action=url-stats&format=json&shorturl=' . $args{URL} . '&signature=' . $self->{SIGNATURE});
     }
     $self->{response}->is_success || die 'Failed to get yourls.org link: ' . $self->{response}->status_line;
-    $self->{$self->{url}}->{content} = $self->{xml}->XMLin($self->{response}->{_content});
-    $self->{$self->{url}}->{errorCode} = $self->{$self->{url}}->{content}->{errorCode};
-    if ($self->{$self->{url}}->{errorCode} == 0 ) {
-        $self->{$self->{url}}->{clicks} = $self->{$self->{url}}->{content}->{results};
-        return $self->{$self->{url}}->{clicks};
-    } else {
-        return;
-    }
+    $self->{$args{URL}}->{clicks} = $self->{json}->jsonToObj($self->{response}->{_content})->{clicks} if (defined $self->{json}->jsonToObj($self->{response}->{_content})->{statusCode} && $self->{json}->jsonToObj($self->{response}->{_content})->{statusCode} == 200);
+    return $self->{$args{URL}};
 }
 
 =head2 errors
