@@ -26,12 +26,12 @@ WWW::Shorten::Yourls - Interface to shortening URLs using L<http://yourls.org>
 
 =head1 VERSION
 
-$Revision: 0.02 $
+$Revision: 0.04 $
 
 =cut
 
 BEGIN {
-    our $VERSION = do { my @r = (q$Revision: 0.03 $ =~ /\d+/g); sprintf "%1d."."%02d" x $#r, @r }; # must be all one line, for MakeMaker
+    our $VERSION = do { my @r = (q$Revision: 0.04 $ =~ /\d+/g); sprintf "%1d."."%02d" x $#r, @r }; # must be all one line, for MakeMaker
     $WWW::Shorten::Yourls::VERBOSITY = 2;
 }
 
@@ -204,7 +204,7 @@ sub shorten {
         return -1;
     }
     $args{format} ||= 'json';
-    if (!$self->{SIGNATURE} {
+    if (!$self->{SIGNATURE}) {
         $self->{response} = $self->{browser}->post($self->{BASE} . '/yourls-api.php', [
             'url' => $args{URL},
             #        'keyword' => $args{keyword},
@@ -244,7 +244,7 @@ sub expand {
         return -1;
     }
     $args{format} ||= 'json';
-    if (!$self->{SIGNATURE} {
+    if (!$self->{SIGNATURE}) {
         $self->{response} = $self->{browser}->post($self->{BASE} . '/yourls-api.php', [
             'shorturl' => $args{URL},
             'action'   => 'expand',
@@ -275,7 +275,7 @@ THIS HAS NOT BEEN IMPLEMENTED YET AS YOURLS DOESN'T SUPPORT THIS FUNCTIONALITY.
 
 sub clicks {
     my $self = shift;
-    if (!$self->{SIGNATURE} {
+    if (!$self->{SIGNATURE}) {
         $self->{response} = $self->{browser}->post($self->{BASE} . '/stats', [
             'format' => 'json',
             'shortUrl' => $self->{url},
@@ -308,7 +308,7 @@ THIS IS NOT WORKING RIGHT NOW AS YOURLS DOESN'T SUPPORT ERROR RESPONSES FROM A U
 
 sub errors {
     my $self = shift;
-    if (!$self->{SIGNATURE} {
+    if (!$self->{SIGNATURE}) {
         $self->{response} = $self->{browser}->post($self->{BASE} . '/errors', [
             'username' => $self->{USER},
             'password' => $self->{PASSWORD},
