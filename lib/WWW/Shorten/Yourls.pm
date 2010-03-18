@@ -31,7 +31,7 @@ $Revision: 0.02 $
 =cut
 
 BEGIN {
-    our $VERSION = do { my @r = (q$Revision: 0.02 $ =~ /\d+/g); sprintf "%1d."."%02d" x $#r, @r }; # must be all one line, for MakeMaker
+    our $VERSION = do { my @r = (q$Revision: 0.03 $ =~ /\d+/g); sprintf "%1d."."%02d" x $#r, @r }; # must be all one line, for MakeMaker
     $WWW::Shorten::Yourls::VERBOSITY = 2;
 }
 
@@ -89,26 +89,24 @@ sub new {
         while(<$fh>){
             $args{USER} ||= $1 if m{^USER=(.*)};
             $args{PASSWORD} ||= $1 if m{^PASSWORD=(.*)};
+            $args{SIGNATURE} ||= $1 if m{^SIGNATURE=(.*)};
         }
         close $fh;
     }
-    if (!defined $args{USER} || !defined $args{PASSWORD} || !defined $args{BASE}) {
-        carp("USER,PASSWORD and BASE are required parameters.\n");
+    if (((!defined $args{USER} || !defined $args{PASSWORD}) && !defined $args{SIGNATURE} ) || !defined $args{BASE}) {
+        carp("USER and PASSWORD or SIGNATURE and BASE are required parameters.\n");
         return -1;
     }
     my $yourls;
     $yourls->{USER} = $args{USER};
     $yourls->{PASSWORD} = $args{PASSWORD};
     $yourls->{BASE} = $args{BASE};
+    $yourls->{SIGNATURE} = $args{SIGNATURE};
     $yourls->{json} = JSON::Any->new;
     $yourls->{browser} = LWP::UserAgent->new(agent => $args{source});
     $yourls->{xml} = new XML::Simple(SuppressEmpty => 1);
     my ($self) = $yourls;
     bless $self, $class;
-#    if (defined $args{URL}) {
-#        $self->shorten(URL => $args{URL});
-#        return $self->{url};
-#    }
 }
 
 
@@ -138,7 +136,6 @@ sub makeashorterlink #($;%)
     my $yurl = $base . "/yourls-api.php";
     $yourls->{response} = $ua->post($yurl, [
         'url' => $url,
-#        'keyword' => $keyword,
         'format' => 'json',
         'action' => 'shorturl',
         'username' => $user,
@@ -175,7 +172,6 @@ sub makealongerlink #($,%)
     $yourls->{xml} = new XML::Simple(SuppressEmpty => 1);
     $yourls->{response} = $ua->post($yurl, [
         'shorturl' => $url,
-#        'keyword' => $keyword,
         'format' => 'json',
         'action' => 'expand',
         'username' => $user,
@@ -208,14 +204,24 @@ sub shorten {
         return -1;
     }
     $args{format} ||= 'json';
-    $self->{response} = $self->{browser}->post($self->{BASE} . '/yourls-api.php', [
-        'url' => $args{URL},
-#        'keyword' => $args{keyword},
-        'format' => $args{format},
-        'action' => 'shorturl',
-        'username' => $self->{USER},
-        'password' => $self->{PASSWORD},
-    ]);
+    if (!$self->{SIGNATURE} {
+        $self->{response} = $self->{browser}->post($self->{BASE} . '/yourls-api.php', [
+            'url' => $args{URL},
+            #        'keyword' => $args{keyword},
+            'format' => $args{format},
+            'action' => 'shorturl',
+            'username' => $self->{USER},
+            'password' => $self->{PASSWORD},
+        ]);
+    } else {
+        $self->{response} = $self->{browser}->post($self->{BASE} . '/yourls-api.php', [
+            'url' => $args{URL},
+            #        'keyword' => $args{keyword},
+            'format' => $args{format},
+            'action' => 'shorturl',
+            'signature' => $self->{SIGNATURE},
+        ]);
+    }
     $self->{response}->is_success || die 'Failed to get yourls.org link: ' . $self->{response}->status_line;
     $self->{url} = $self->{json}->jsonToObj($self->{response}->{_content})->{shorturl} if (defined $self->{json}->jsonToObj($self->{response}->{_content})->{statusCode} && $self->{json}->jsonToObj($self->{response}->{_content})->{statusCode} == 200);
     return $self->{url}
@@ -238,13 +244,22 @@ sub expand {
         return -1;
     }
     $args{format} ||= 'json';
-    $self->{response} = $self->{browser}->post($self->{BASE} . '/yourls-api.php', [
-        'shorturl' => $args{URL},
-        'action'   => 'expand',
-        'username' => $self->{USER},
-        'password' => $self->{PASSWORD},
-        'format'   => $args{format}
-    ]);
+    if (!$self->{SIGNATURE} {
+        $self->{response} = $self->{browser}->post($self->{BASE} . '/yourls-api.php', [
+            'shorturl' => $args{URL},
+            'action'   => 'expand',
+            'username' => $self->{USER},
+            'password' => $self->{PASSWORD},
+            'format'   => $args{format}
+        ]);
+    } else {
+        $self->{response} = $self->{browser}->post($self->{BASE} . '/yourls-api.php', [
+            'shorturl' => $args{URL},
+            'action'   => 'expand',
+            'signature' => $self->{SIGNATURE},
+            'format'   => $args{format}
+        ]);
+    }
     $self->{response}->is_success || die 'Failed to get yourls.org link: ' . $self->{response}->status_line;
     $self->{longurl} = $self->{json}->jsonToObj($self->{response}->{_content})->{longurl} if (defined $self->{json}->jsonToObj($self->{response}->{_content})->{statusCode} && $self->{json}->jsonToObj($self->{response}->{_content})->{statusCode} == 200);
     return $self->{longurl};
@@ -260,12 +275,20 @@ THIS HAS NOT BEEN IMPLEMENTED YET AS YOURLS DOESN'T SUPPORT THIS FUNCTIONALITY.
 
 sub clicks {
     my $self = shift;
-    $self->{response} = $self->{browser}->post($self->{BASE} . '/stats', [
-        'format' => 'json',
-        'shortUrl' => $self->{url},
-        'username' => $self->{USER},
-        'password' => $self->{PASSWORD},
-    ]);
+    if (!$self->{SIGNATURE} {
+        $self->{response} = $self->{browser}->post($self->{BASE} . '/stats', [
+            'format' => 'json',
+            'shortUrl' => $self->{url},
+            'username' => $self->{USER},
+            'password' => $self->{PASSWORD},
+        ]);
+    } else {
+        $self->{response} = $self->{browser}->post($self->{BASE} . '/stats', [
+            'format' => 'json',
+            'shortUrl' => $self->{url},
+            'signature' => $self->{SIGNATURE},
+        ]);
+    }
     $self->{response}->is_success || die 'Failed to get yourls.org link: ' . $self->{response}->status_line;
     $self->{$self->{url}}->{content} = $self->{xml}->XMLin($self->{response}->{_content});
     $self->{$self->{url}}->{errorCode} = $self->{$self->{url}}->{content}->{errorCode};
@@ -285,10 +308,16 @@ THIS IS NOT WORKING RIGHT NOW AS YOURLS DOESN'T SUPPORT ERROR RESPONSES FROM A U
 
 sub errors {
     my $self = shift;
-    $self->{response} = $self->{browser}->post($self->{BASE} . '/errors', [
-        'username' => $self->{USER},
-        'password' => $self->{PASSWORD},
-    ]);
+    if (!$self->{SIGNATURE} {
+        $self->{response} = $self->{browser}->post($self->{BASE} . '/errors', [
+            'username' => $self->{USER},
+            'password' => $self->{PASSWORD},
+        ]);
+    } else {
+        $self->{response} = $self->{browser}->post($self->{BASE} . '/errors', [
+            'signature' => $self->{SIGNATURE},
+        ]);
+    }
     $self->{response}->is_success || die 'Failed to get yourls.org link: ' . $self->{response}->status_line;
     $self->{$self->{url}}->{content} = $self->{xml}->XMLin($self->{response}->{_content});
     $self->{$self->{url}}->{errorCode} = $self->{$self->{url}}->{content}->{errorCode};
