@@ -26,12 +26,12 @@ WWW::Shorten::Yourls - Interface to shortening URLs using L<http://yourls.org>
 
 =head1 VERSION
 
-$Revision: 0.05 $
+$Revision: 0.06 $
 
 =cut
 
 BEGIN {
-    our $VERSION = do { my @r = (q$Revision: 0.05 $ =~ /\d+/g); sprintf "%1d."."%02d" x $#r, @r }; # must be all one line, for MakeMaker
+    our $VERSION = do { my @r = (q$Revision: 0.06 $ =~ /\d+/g); sprintf "%1d."."%02d" x $#r, @r }; # must be all one line, for MakeMaker
     $WWW::Shorten::Yourls::VERBOSITY = 2;
 }
 
@@ -93,8 +93,8 @@ sub new {
         }
         close $fh;
     }
-    if (((!$args{USER} || !$args{PASSWORD}) && !$args{SIGNATURE}) || !$args{BASE}) {
-        carp("USER and PASSWORD or SIGNATURE and BASE are required parameters.\n");
+    if (((!$args{USER} && !$args{PASSWORD}) && (!$args{USER} && !$args{SIGNATURE})) || !$args{BASE}) {
+        carp("USER/PASSWORD or USER/SIGNATURE and BASE are required parameters.\n");
         return -1;
     }
     my $yourls;
@@ -293,7 +293,10 @@ sub clicks {
         $self->{response} = $self->{browser}->get($self->{BASE} . '/yourls-api.php?action=url-stats&format=json&shorturl=' . $args{URL} . '&signature=' . $self->{SIGNATURE});
     }
     $self->{response}->is_success || die 'Failed to get yourls.org link: ' . $self->{response}->status_line;
-    $self->{$args{URL}}->{clicks} = $self->{json}->jsonToObj($self->{response}->{_content})->{clicks} if (defined $self->{json}->jsonToObj($self->{response}->{_content})->{statusCode} && $self->{json}->jsonToObj($self->{response}->{_content})->{statusCode} == 200);
+    if (defined $self->{json}->jsonToObj($self->{response}->{_content})->{statusCode} && $self->{json}->jsonToObj($self->{response}->{_content})->{statusCode} == 200) {
+        $self->{$args{URL}}->{clicks} = $self->{json}->jsonToObj($self->{response}->{_content})->{link}->{clicks};
+        $self->{$args{URL}}->{info} = $self->{json}->jsonToObj($self->{response}->{_content});
+    }
     return $self->{$args{URL}};
 }
 
