@@ -15,10 +15,15 @@ WriteMakefile(
       : ()),
     PL_FILES            => {},
     PREREQ_PM => {
-        'Test::More' => 0,
+        'Test::More'   => 0,
         'WWW::Shorten' => 1.90,
         'XML::Simple'  => 2.18,
         'JSON::Any'    => 1.18,
+    },
+    TEST_REQUIRES => {
+        'Pod::Coverage'       => 0,
+        'Test::Pod'           => 0,
+        'Test::Pod::Coverage' => 0,
     },
     PREREQ_PRINT        => 1,
     dist                => { COMPRESS => 'gzip -9f', SUFFIX => 'gz', },
