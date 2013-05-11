@@ -60,8 +60,18 @@ or
     use WWW::Shorten::Yourls;
 
     my $url = "http://www.example.com";
-    my $yourls = WWW::Shorten::Yourls->new(USER => "my_user_id",
-    APIKEY => "my_api_key");
+    my $yourls = WWW::Shorten::Yourls->new(
+        SIGNATURE => "my_api_key",
+        BASE      => 'myyourlsinstall.example.com',
+    );
+
+    or 
+
+    my $yourls = WWW::Shorten::Yourls->new(
+        USER     => "my_user",
+        PASSWORD => "my_pass",
+        BASE     => 'myyourlsinstall.example.com',
+    );
 
     $yourls->shorten(URL => $url);
     print "shortened URL is $yourls->{url}\n";
@@ -75,9 +85,18 @@ or
 
 Create a new yourls.org object using your yourls.org user id and yourls.org api key.
 
-    my $yourls = WWW::Shorten::Yourls->new(URL => "http://www.example.com/this_is_one_example.html",
-    USER => "yourls_user_id",
-    PASSWORD => "yourls_password");
+    my $yourls = WWW::Shorten::Yourls->new(
+        SIGNATURE => "my_api_key",
+        BASE      => 'myyourlsinstall.example.com',
+    );
+
+    or 
+
+    my $yourls = WWW::Shorten::Yourls->new(
+        USER     => "my_user",
+        PASSWORD => "my_pass",
+        BASE     => 'myyourlsinstall.example.com',
+    );
 
 =cut
 
