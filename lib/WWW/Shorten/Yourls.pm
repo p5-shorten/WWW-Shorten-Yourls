@@ -40,31 +40,34 @@ BEGIN {
 
 =head1 SYNOPSIS
 
-WWW::Shorten::Yourls provides an easy interface for shortening URLs using http://yourls.org. In addition to shortening URLs, you can pull statistics that yourls.org gathers regarding each shortened
-WWW::Shorten::Yourls uses XML::Simple to convert the xml response for the meta info and click stats to create a hashref of the results.
+WWW::Shorten::Yourls provides an easy interface for shortening URLs 
+using http://yourls.org. In addition to shortening URLs, you can pull 
+statistics that yourls.org gathers regarding each shortened
+WWW::Shorten::Yourls uses XML::Simple to convert the xml response for 
+the meta info and click stats to create a hashref of the results.
 
 WWW::Shorten::Yourls provides two interfaces. The first is the common C<makeashorterlink> and C<makealongerlink> that WWW::Shorten provides. However, due to the way the yourls.org API works, additional arguments are required. The second provides a better way of retrieving additional information and statistics about a yourls.org URL.
 
-use WWW::Shorten::Yourls;
+    use WWW::Shorten::Yourls;
 
-my $url = "http://www.example.com";
+    my $url = "http://www.example.com";
 
-my $tmp = makeashorterlink($url, 'MY_YOURLS_USERNAME', 'MY_YOURLS_PASSWORD');
-my $tmp1 = makealongerlink($tmp, 'MY_YOURLS_USERNAME', 'MY_YOURLS_PASSWORD');
+    my $tmp = makeashorterlink($url, 'MY_YOURLS_USERNAME', 'MY_YOURLS_PASSWORD');
+    my $tmp1 = makealongerlink($tmp, 'MY_YOURLS_USERNAME', 'MY_YOURLS_PASSWORD');
 
 or
 
-use WWW::Shorten::Yourls;
+    use WWW::Shorten::Yourls;
 
-my $url = "http://www.example.com";
-my $yourls = WWW::Shorten::Yourls->new(USER => "my_user_id",
-APIKEY => "my_api_key");
+    my $url = "http://www.example.com";
+    my $yourls = WWW::Shorten::Yourls->new(USER => "my_user_id",
+    APIKEY => "my_api_key");
 
-$yourls->shorten(URL => $url);
-print "shortened URL is $yourls->{url}\n";
+    $yourls->shorten(URL => $url);
+    print "shortened URL is $yourls->{url}\n";
 
-$yourls->expand(URL => $yourls->{url});
-print "expanded/original URL is $yourls->{longurl}\n";
+    $yourls->expand(URL => $yourls->{url});
+    print "expanded/original URL is $yourls->{longurl}\n";
 
 =head1 FUNCTIONS
 
@@ -72,9 +75,9 @@ print "expanded/original URL is $yourls->{longurl}\n";
 
 Create a new yourls.org object using your yourls.org user id and yourls.org api key.
 
-my $yourls = WWW::Shorten::Yourls->new(URL => "http://www.example.com/this_is_one_example.html",
-USER => "yourls_user_id",
-PASSWORD => "yourls_password");
+    my $yourls = WWW::Shorten::Yourls->new(URL => "http://www.example.com/this_is_one_example.html",
+    USER => "yourls_user_id",
+    PASSWORD => "yourls_password");
 
 =cut
 
@@ -117,7 +120,7 @@ your long URL and will return the shorter yourls.org version.
 
 yourls.org requires the use of a user id and password to shorten links.
 
-makeashorterlink($url,$uid,$passwd,$base);
+    makeashorterlink($url,$uid,$passwd,$base);
 
 =cut
 
@@ -155,7 +158,7 @@ Key when using the API.
 
 If anything goes wrong, then the function will return C<undef>.
 
-makealongerlink($url,$uid,$passwd,$base);
+    makealongerlink($url,$uid,$passwd,$base);
 
 THIS IS NOT WORKING RIGHT NOW AS YOURLS DOESN'T SUPPORT EXPANDING A URL.
 
@@ -184,14 +187,16 @@ sub makealongerlink #($,%)
 
 =head2 shorten
 
-Shorten a URL using http://yourls.org. Calling the shorten method will return the shortened URL but will also store it in yourls.org object until the next call is made.
+Shorten a URL using http://yourls.org. Calling the shorten method will 
+return the shortened URL but will also store it in yourls.org object 
+until the next call is made.
 
-my $url = "http://www.example.com";
-my $shortstuff = $yourls->shorten(URL => $url);
+    my $url = "http://www.example.com";
+    my $shortstuff = $yourls->shorten(URL => $url);
 
-print "yurl is " . $yourls->{url} . "\n";
+    print "yurl is " . $yourls->{url} . "\n";
 or
-print "yurl is $shortstuff\n";
+    print "yurl is $shortstuff\n";
 
 =cut
 
@@ -235,6 +240,7 @@ THIS ONLY WORKS WITH YOURLS 1.4+
 Versions prior to Yourls 1.4 don't support expansion of shortened URLs.
 
 =cut
+
 sub expand {
     my $self = shift;
     my %args = @_;
@@ -267,7 +273,10 @@ sub expand {
 
 =head2 clicks
 
-Get click thru information for a shortened yourls.org URL. By default, the method will use the value that's stored in $yourls->{url}. To be sure you're getting info on the correct URL, it's a good idea to set this value before getting any info on it.
+Get click-through information for a shortened yourls.org URL. By 
+default, the method will use the value that's stored in 
+$yourls->{url}. To be sure you're getting info on the correct URL, 
+it's a good idea to set this value before getting any info on it.
 
 THIS HAS NOT BEEN IMPLEMENTED YET AS YOURLS DOESN'T SUPPORT THIS FUNCTIONALITY.
 
@@ -334,9 +343,10 @@ sub errors {
 Gets the module version number
 
 =cut
+
 sub version {
     my $self = shift;
-    my($version) = shift;# not sure why $version isn't being set. need to look at it
+    my($version) = shift; # not sure why $version isn't being set. need to look at it
     warn "Version $version is later then $WWW::Shorten::Yourls::VERSION. It may not be supported" if (defined ($version) && ($version > $WWW::Shorten::Yourls::VERSION));
     return $WWW::Shorten::Yourls::VERSION;
 }#version
