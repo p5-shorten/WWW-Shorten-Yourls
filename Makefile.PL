@@ -10,13 +10,15 @@ WriteMakefile(
     ($ExtUtils::MakeMaker::VERSION >= 6.3002
       ? ('LICENSE'=> 'perl')
       : ()),
+    ($ExtUtils::MakeMaker::VERSION >= 6.48
+      ? ('MIN_PERL_VERSION'=> '5.6.1')
+      : ()),
     PL_FILES            => {},
     PREREQ_PM => {
         'Test::More' => 0,
         'WWW::Shorten' => 1.90,
         'XML::Simple'  => 2.18,
         'JSON::Any'    => 1.18,
-        'Modern::Perl' => 1.03
     },
     PREREQ_PRINT        => 1,
     dist                => { COMPRESS => 'gzip -9f', SUFFIX => 'gz', },
