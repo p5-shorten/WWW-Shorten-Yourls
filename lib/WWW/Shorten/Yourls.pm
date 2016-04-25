@@ -85,16 +85,15 @@ sub makeashorterlink {
 }
 
 sub makealongerlink {
-    my $url = shift
-        or croak('No shortened yourls.org URL passed to makealongerlink');
-    my ($user, $password, $base) = @_
-        or croak('No username, password, or base passed to makealongerlink');
+    my ($url, $user, $password, $base) = @_;
+    Carp::croak('No URL passed to makealongerlink') unless $url;
+    Carp::croak('No username passed to makealongerlink') unless $user;
+    Carp::croak('No password passed to makealongerlink') unless $password;
+    Carp::croak('No base passed to makealongerlink') unless $base;
+
     my $ua   = __PACKAGE__->ua();
     my $yurl = $base . "/yourls-api.php";
-    my $yourls;
-    $yourls->{json}     = JSON::Any->new;
-    $yourls->{xml}      = XML::Simple(SuppressEmpty => 1)->new;
-    $yourls->{response} = $ua->post(
+    my $res = $ua->post(
         $yurl,
         [
             'shorturl' => $url,
@@ -104,17 +103,10 @@ sub makealongerlink {
             'password' => $password,
         ]
     );
-    $yourls->{response}->is_success
-        || die 'Failed to get yourls.org link: '
-        . $yourls->{response}->status_line;
-    $yourls->{longurl}
-        = $yourls->{json}->jsonToObj($yourls->{response}->{_content})->{longurl}
-        if (
-        defined $yourls->{json}->jsonToObj($yourls->{response}->{_content})
-        ->{statusCode}
-        && $yourls->{json}->jsonToObj($yourls->{response}->{_content})
-        ->{statusCode} == 200);
-    return $yourls->{longurl};
+    $res->is_success || die 'Failed to get yourls.org link: '. $res->status_line;
+    my $obj = JSON::MaybeXS::decode_json($res->decoded_content);
+    return $obj->{longurl} if $obj->{longurl};
+    return undef;
 }
 
 sub shorten {
