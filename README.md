@@ -21,7 +21,7 @@ additional information and statistics about a URL.
     my $tmp = makeashorterlink($url, 'MY_YOURLS_USERNAME', 'MY_YOURLS_PASSWORD');
     my $tmp1 = makealongerlink($tmp, 'MY_YOURLS_USERNAME', 'MY_YOURLS_PASSWORD');
 
-or
+    # or
 
     use WWW::Shorten::Yourls;
 
@@ -31,7 +31,7 @@ or
         BASE      => 'myyourlsinstall.example.com',
     );
 
-    or
+    # or
 
     my $yourls = WWW::Shorten::Yourls->new(
         USER     => "my_user",
@@ -56,7 +56,7 @@ Create a new instance object using your user id and API key.
         BASE      => 'myyourlsinstall.example.com',
     );
 
-    or
+    # or
 
     my $yourls = WWW::Shorten::Yourls->new(
         USER     => "my_user",
@@ -96,7 +96,7 @@ until the next call is made.
     my $shortstuff = $yourls->shorten(URL => $url);
 
     print "yurl is " . $yourls->{url} . "\n";
-or
+    # or
     print "yurl is $shortstuff\n";
 
 ## expand
@@ -107,7 +107,7 @@ Expands a shortened URL to the original long URL.
 
 Get click-through information for a shortened URL. By
 default, the method will use the value that's stored in
-`<$yourls-`{url}>>. To be sure you're getting info on the correct URL,
+`$yourls->{url}`. To be sure you're getting info on the correct URL,
 it's a good idea to set this value before getting any info on it.
 
 THIS IS NOT WORKING.

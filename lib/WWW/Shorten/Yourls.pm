@@ -4,7 +4,7 @@ use warnings;
 use strict;
 use Carp ();
 use File::Spec;
-use JSON::Any;
+use JSON::MaybeXS;
 use XML::Simple();
 
 use base qw( WWW::Shorten::generic Exporter );
@@ -53,7 +53,6 @@ sub new {
     $yourls->{PASSWORD}  = $args{PASSWORD};
     $yourls->{BASE}      = $args{BASE};
     $yourls->{SIGNATURE} = $args{SIGNATURE};
-    $yourls->{json}      = JSON::Any->new;
     $yourls->{browser}   = LWP::UserAgent->new(agent => $args{source});
     $yourls->{xml}       = XML::Simple(SuppressEmpty => 1)->new;
     my ($self) = $yourls;
@@ -61,23 +60,15 @@ sub new {
 }
 
 sub makeashorterlink {
-    my $url = shift or croak('No URL passed to makeashorterlink');
-    my ($user, $password, $base) = @_
-        or croak(
-        'No username, password or Yourls service URL passed to makeshorterlink'
-        );
-    if (!defined $url || !defined $user || !defined $password) {
-        croak(
-            "url, user, password, base are required for shortening a URL with yourls.org - in that specific order"
-        );
-        &help();
-    }
+    my ($url, $user, $password, $base) = @_;
+    Carp::croak('No URL passed to makeashorterlink') unless $url;
+    Carp::croak('No username passed to makeashorterlink') unless $user;
+    Carp::croak('No password passed to makeashorterlink') unless $password;
+    Carp::croak('No base passed to makeashorterlink') unless $base;
+
     my $ua = __PACKAGE__->ua();
-    my $yourls;
-    $yourls->{json} = JSON::Any->new;
-    $yourls->{xml} = XML::Simple(SuppressEmpty => 1)->new;
     my $yurl = $base . "/yourls-api.php";
-    $yourls->{response} = $ua->post(
+    my $res = $ua->post(
         $yurl,
         [
             'url'      => $url,
@@ -87,18 +78,10 @@ sub makeashorterlink {
             'password' => $password,
         ]
     );
-    $yourls->{response}->is_success
-        || die 'Failed to get yourls.org link: '
-        . $yourls->{response}->status_line;
-    $yourls->{url}
-        = $yourls->{json}->jsonToObj($yourls->{response}->{_content})
-        ->{shorturl}
-        if (
-        defined $yourls->{json}->jsonToObj($yourls->{response}->{_content})
-        ->{statusCode}
-        && $yourls->{json}->jsonToObj($yourls->{response}->{_content})
-        ->{statusCode} == 200);
-    return $yourls->{url};
+    $res->is_success || die 'Failed to get yourls.org link: '. $res->status_line;
+    my $obj = JSON::MaybeXS::decode_json($res->decoded_content);
+    return $obj->{url} if $obj->{url};
+    return undef;
 }
 
 sub makealongerlink {
@@ -329,7 +312,7 @@ additional information and statistics about a URL.
     my $tmp = makeashorterlink($url, 'MY_YOURLS_USERNAME', 'MY_YOURLS_PASSWORD');
     my $tmp1 = makealongerlink($tmp, 'MY_YOURLS_USERNAME', 'MY_YOURLS_PASSWORD');
 
-or
+    # or
 
     use WWW::Shorten::Yourls;
 
@@ -339,7 +322,7 @@ or
         BASE      => 'myyourlsinstall.example.com',
     );
 
-    or
+    # or
 
     my $yourls = WWW::Shorten::Yourls->new(
         USER     => "my_user",
@@ -364,7 +347,7 @@ Create a new instance object using your user id and API key.
         BASE      => 'myyourlsinstall.example.com',
     );
 
-    or
+    # or
 
     my $yourls = WWW::Shorten::Yourls->new(
         USER     => "my_user",
@@ -404,7 +387,7 @@ until the next call is made.
     my $shortstuff = $yourls->shorten(URL => $url);
 
     print "yurl is " . $yourls->{url} . "\n";
-or
+    # or
     print "yurl is $shortstuff\n";
 
 =head2 expand
@@ -415,7 +398,7 @@ Expands a shortened URL to the original long URL.
 
 Get click-through information for a shortened URL. By
 default, the method will use the value that's stored in
-C<<$yourls->{url}>>. To be sure you're getting info on the correct URL,
+C<< $yourls->{url} >>. To be sure you're getting info on the correct URL,
 it's a good idea to set this value before getting any info on it.
 
 THIS IS NOT WORKING.
