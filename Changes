@@ -4,6 +4,9 @@ Revision history for {{$dist->name}}
     - Backfilled Changelog as best as possible.
     - Added tidy, git, mailmap, and travis files.
     - Added a MANIFEST.SKIP
+    - Cleaned up documentation
+    - DZil-ified
+    - Made the README a github markdown file.
 
 0.06    2010-03-23
     - Added signature
