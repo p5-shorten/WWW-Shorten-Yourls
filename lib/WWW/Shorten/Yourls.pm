@@ -3,6 +3,7 @@ package WWW::Shorten::Yourls;
 use warnings;
 use strict;
 use Carp ();
+use File::Spec;
 use JSON::Any;
 use XML::Simple();
 
@@ -21,7 +22,6 @@ sub new {
     my ($class) = shift;
     my %args = @_;
     $args{source} ||= "teknatusyourls";
-    use File::Spec;
     my $yourlsrc
         = $^O =~ /Win32/i
         ? File::Spec->catfile($ENV{HOME}, "_yourls")
@@ -55,7 +55,7 @@ sub new {
     $yourls->{SIGNATURE} = $args{SIGNATURE};
     $yourls->{json}      = JSON::Any->new;
     $yourls->{browser}   = LWP::UserAgent->new(agent => $args{source});
-    $yourls->{xml}       = new XML::Simple(SuppressEmpty => 1);
+    $yourls->{xml}       = XML::Simple(SuppressEmpty => 1)->new;
     my ($self) = $yourls;
     bless $self, $class;
 }
@@ -75,7 +75,7 @@ sub makeashorterlink {
     my $ua = __PACKAGE__->ua();
     my $yourls;
     $yourls->{json} = JSON::Any->new;
-    $yourls->{xml} = new XML::Simple(SuppressEmpty => 1);
+    $yourls->{xml} = XML::Simple(SuppressEmpty => 1)->new;
     my $yurl = $base . "/yourls-api.php";
     $yourls->{response} = $ua->post(
         $yurl,
@@ -110,7 +110,7 @@ sub makealongerlink {
     my $yurl = $base . "/yourls-api.php";
     my $yourls;
     $yourls->{json}     = JSON::Any->new;
-    $yourls->{xml}      = new XML::Simple(SuppressEmpty => 1);
+    $yourls->{xml}      = XML::Simple(SuppressEmpty => 1)->new;
     $yourls->{response} = $ua->post(
         $yurl,
         [
@@ -300,15 +300,7 @@ sub errors {
     }
 }
 
-sub version {
-    my $self = shift;
-    my ($version)
-        = shift;    # not sure why $version isn't being set. need to look at it
-    warn
-        "Version $version is later then $WWW::Shorten::Yourls::VERSION. It may not be supported"
-        if (defined($version) && ($version > $WWW::Shorten::Yourls::VERSION));
-    return $WWW::Shorten::Yourls::VERSION;
-}    #version
+sub version { $WWW::Shorten::Yourls::VERSION; }
 
 1;   # End of WWW::Shorten::Yourls
 
