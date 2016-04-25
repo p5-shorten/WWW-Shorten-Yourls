@@ -1,5 +1,15 @@
-Revision history for WWW-Shorten-Yourls
+Revision history for {{$dist->name}}
 
-0.01    Date/time
-        First version, released on an unsuspecting world.
+{{$NEXT}}
+    - Backfilled Changelog as best as possible.
+    - Added tidy, git, mailmap, and travis files.
+    - Added a MANIFEST.SKIP
 
+0.06    2010-03-23
+    - Added signature
+
+0.02    2009-09-22
+    - Updated response parsing
+
+0.01    2009-09-13
+    - First version, released on an unsuspecting world.
