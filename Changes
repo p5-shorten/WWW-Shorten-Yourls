@@ -7,6 +7,8 @@ Revision history for {{$dist->name}}
     - Cleaned up documentation
     - DZil-ified
     - Made the README a github markdown file.
+    - Add LICENSE file to repository
+    - Add CONTRIBUTING.md to repository
 
 0.06    2010-03-23
     - Added signature
