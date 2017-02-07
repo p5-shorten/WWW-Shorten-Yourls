@@ -37,9 +37,11 @@ my %WriteMakefileArgs = (
     "File::HomeDir" => "1.00",
     "File::Spec" => 0,
     "Path::Tiny" => 0,
-    "Test::More" => "0.88"
+    "Test::More" => "0.88",
+    "Try::Tiny" => "0.24",
+    "URI" => "1.58"
   },
-  "VERSION" => "0.070",
+  "VERSION" => "1.000",
   "test" => {
     "TESTS" => "t/*.t"
   }
@@ -57,6 +59,7 @@ my %FallbackPrereqs = (
   "Path::Tiny" => 0,
   "Scalar::Util" => 0,
   "Test::More" => "0.88",
+  "Try::Tiny" => "0.24",
   "URI" => "1.58",
   "WWW::Shorten" => "3.09",
   "base" => 0,

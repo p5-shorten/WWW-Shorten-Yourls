@@ -1,281 +1,308 @@
 package WWW::Shorten::Yourls;
 
-use warnings;
 use strict;
+use warnings;
 use Carp ();
-use File::Spec;
+use File::HomeDir ();
+use File::Spec ();
 use JSON::MaybeXS;
-use XML::Simple();
+use Path::Tiny qw(path);
+use Scalar::Util qw(blessed);
+use URI ();
 
 use base qw( WWW::Shorten::generic Exporter );
 
-our $VERSION = '0.070';
+our $VERSION = '1.000';
 $VERSION = eval $VERSION;
 
-our %EXPORT_TAGS = ('all' => [qw()]);
-our @EXPORT_OK   = (@{$EXPORT_TAGS{'all'}});
-our @EXPORT      = qw(new version);
+our @EXPORT = qw(new);
 
-our @ISA = qw(Exporter);
+# _attr (private)
+sub _attr {
+    my $self = shift;
+    my $attr = lc(_trim(shift) || '');
+    # attribute list is small enough to just grep each time. meh.
+    Carp::croak("Invalid attribute") unless grep {$attr eq $_} @{_attrs()};
+    return $self->{$attr} unless @_;
+
+    my $val = shift;
+    unless (defined($val)) {
+        $self->{$attr} = undef;
+        return $self;
+    }
+    $self->{$attr} = $val;
+    return $self;
+}
+
+# _attrs (static, private)
+{
+    my $attrs; # mimic the state keyword
+    sub _attrs {
+        return [@{$attrs}] if $attrs;
+        $attrs = [
+            qw(username password server signature),
+        ];
+        return [@{$attrs}];
+    }
+}
+
+# _json_request (static, private)
+sub _json_request {
+    my $url = shift;
+    Carp::croak("Invalid URI object") unless $url && blessed($url) && $url->isa('URI');
+    my $ua = __PACKAGE__->ua();
+    my $res = $ua->get($url);
+    Carp::croak("Invalid response") unless $res;
+    unless ($res->is_success) {
+        Carp::croak($res->status_line);
+    }
+
+    my $content_type = $res->header('Content-Type');
+    my $content = $res->decoded_content();
+    unless ($content_type && $content_type =~ m{application/json}) {
+        Carp::croak("Unexpected response: $content");
+    }
+    my $json = decode_json($content);
+    Carp::croak("Invalid data returned: $content") unless $json;
+    return $json;
+}
+
+# _parse_args (static, private)
+sub _parse_args {
+    my $args;
+    if ( @_ == 1 && ref $_[0] ) {
+        my %copy = eval { %{ $_[0] } }; # try shallow copy
+        Carp::croak("Argument to method could not be dereferenced as a hash") if $@;
+        $args = \%copy;
+    }
+    elsif (@_==1 && !ref($_[0])) {
+        $args = {single_arg => $_[0]};
+    }
+    elsif ( @_ % 2 == 0 ) {
+        $args = {@_};
+    }
+    else {
+        Carp::croak("Method got an odd number of elements");
+    }
+    return $args;
+}
+
+# _parse_config (static, private)
+{
+    my $config; # mimic the state keyword
+    sub _parse_config {
+        # always give back a shallow copy
+        return {%{$config}} if $config;
+        # only parse the file once, please.
+        $config = {};
+        my $file = $^O eq 'MSWin32'? '_yourls': '.yourls';
+        $file .= '_test' if $ENV{YOURLS_TEST_CONFIG};
+        my $path = path(File::Spec->catfile(File::HomeDir->my_home(), $file));
+
+        if ($path && $path->is_file) {
+            my @lines = $path->lines_utf8({chomp => 1});
+            my $attrs = _attrs();
+
+            for my $line (@lines) {
+                $line = _trim($line) || '';
+                next if $line =~ /^\s*[;#]/; # skip comments
+                $line =~ s/\s+[;#].*$//gm; # trim off comments
+                next unless $line && $line =~ /=/; # make sure we have a =
+
+                my ($key, $val) = split(/(?<![^\\]\\)=/, $line, 2);
+                $key = lc(_trim($key) || '');
+                $val = _trim($val);
+                next unless $key && $val;
+                $key = 'username' if $key eq 'user';
+                $key = 'server' if $key eq 'base';
+                next unless grep {$key eq $_} @{$attrs};
+                $config->{$key} = $val;
+            }
+        }
+        return {%{$config}};
+    }
+}
+
+# _trim (static, private)
+sub _trim {
+    my $input = shift;
+    return $input unless defined $input && !ref($input) && length($input);
+    $input =~ s/\A\s*//;
+    $input =~ s/\s*\z//;
+    return $input;
+}
 
 sub new {
-    my ($class) = shift;
-    my %args = @_;
-    $args{source} ||= "teknatusyourls";
-    my $yourlsrc
-        = $^O =~ /Win32/i
-        ? File::Spec->catfile($ENV{HOME}, "_yourls")
-        : File::Spec->catfile($ENV{HOME}, ".yourls");
-    if (-r $yourlsrc) {
-        open my $fh, "<", $yourlsrc or die "can't open .yourls file $!";
-        while (<$fh>) {
-            $args{USER}      ||= $1 if m{^USER=(.*)};
-            $args{PASSWORD}  ||= $1 if m{^PASSWORD=(.*)};
-            $args{SIGNATURE} ||= $1 if m{^SIGNATURE=(.*)};
-        }
-        close $fh;
+    my $class = shift;
+    my $args;
+    if ( @_ == 1 && ref $_[0] ) {
+        my %copy = eval { %{ $_[0] } }; # try shallow copy
+        Carp::croak("Argument to $class->new() could not be dereferenced as a hash") if $@;
+        $args = \%copy;
     }
-    if (
-        (
-               (!$args{USER} && !$args{PASSWORD})
-            && (!$args{USER} && !$args{SIGNATURE})
-        )
-        || !$args{BASE}
-        )
-    {
-        carp(
-            "USER/PASSWORD or USER/SIGNATURE and BASE are required parameters.\n"
-        );
-        return -1;
-    }
-    my $yourls;
-    $yourls->{USER}      = $args{USER};
-    $yourls->{PASSWORD}  = $args{PASSWORD};
-    $yourls->{BASE}      = $args{BASE};
-    $yourls->{SIGNATURE} = $args{SIGNATURE};
-    $yourls->{browser}   = LWP::UserAgent->new(agent => $args{source});
-    $yourls->{xml}       = XML::Simple(SuppressEmpty => 1)->new;
-    my ($self) = $yourls;
-    bless $self, $class;
-}
-
-sub makeashorterlink {
-    my ($url, $user, $password, $base) = @_;
-    Carp::croak('No URL passed to makeashorterlink') unless $url;
-    Carp::croak('No username passed to makeashorterlink') unless $user;
-    Carp::croak('No password passed to makeashorterlink') unless $password;
-    Carp::croak('No base passed to makeashorterlink') unless $base;
-
-    my $ua = __PACKAGE__->ua();
-    my $yurl = $base . "/yourls-api.php";
-    my $res = $ua->post(
-        $yurl,
-        [
-            'url'      => $url,
-            'format'   => 'json',
-            'action'   => 'shorturl',
-            'username' => $user,
-            'password' => $password,
-        ]
-    );
-    $res->is_success || die 'Failed to get yourls.org link: '. $res->status_line;
-    my $obj = JSON::MaybeXS::decode_json($res->decoded_content);
-    return $obj->{url} if $obj->{url};
-    return undef;
-}
-
-sub makealongerlink {
-    my ($url, $user, $password, $base) = @_;
-    Carp::croak('No URL passed to makealongerlink') unless $url;
-    Carp::croak('No username passed to makealongerlink') unless $user;
-    Carp::croak('No password passed to makealongerlink') unless $password;
-    Carp::croak('No base passed to makealongerlink') unless $base;
-
-    my $ua   = __PACKAGE__->ua();
-    my $yurl = $base . "/yourls-api.php";
-    my $res = $ua->post(
-        $yurl,
-        [
-            'shorturl' => $url,
-            'format'   => 'json',
-            'action'   => 'expand',
-            'username' => $user,
-            'password' => $password,
-        ]
-    );
-    $res->is_success || die 'Failed to get yourls.org link: '. $res->status_line;
-    my $obj = JSON::MaybeXS::decode_json($res->decoded_content);
-    return $obj->{longurl} if $obj->{longurl};
-    return undef;
-}
-
-sub shorten {
-    my $self = shift;
-    my %args = @_;
-    if (!defined $args{URL}) {
-        croak("URL is required.\n");
-        return -1;
-    }
-    $args{format} ||= 'json';
-    if (!$self->{SIGNATURE}) {
-        $self->{response} = $self->{browser}->post(
-            $self->{BASE} . '/yourls-api.php',
-            [
-                'url' => $args{URL},
-
-                #        'keyword' => $args{keyword},
-                'format'   => $args{format},
-                'action'   => 'shorturl',
-                'username' => $self->{USER},
-                'password' => $self->{PASSWORD},
-            ]
-        );
+    elsif ( @_ % 2 == 0 ) {
+        $args = {@_};
     }
     else {
-        $self->{response} = $self->{browser}->post(
-            $self->{BASE} . '/yourls-api.php',
-            [
-                'url' => $args{URL},
+        Carp::croak("$class->new() got an odd number of elements");
+    }
 
-                #        'keyword' => $args{keyword},
-                'format'    => $args{format},
-                'action'    => 'shorturl',
-                'signature' => $self->{SIGNATURE},
-            ]
-        );
-    }
-    $self->{response}->is_success
-        || die 'Failed to get yourls.org link: '
-        . $self->{response}->status_line;
-    $self->{url}
-        = $self->{json}->jsonToObj($self->{response}->{_content})->{shorturl}
-        if (
-        defined $self->{json}->jsonToObj($self->{response}->{_content})
-        ->{statusCode}
-        && $self->{json}->jsonToObj($self->{response}->{_content})->{statusCode}
-        == 200);
-    return $self->{url};
-}
+    my $attrs = _attrs();
+    # start with what's in our config file (if anything)
+    my $href = _parse_config();
 
-sub expand {
-    my $self = shift;
-    my %args = @_;
-    $args{URL} ||= $self->{url};
-    if (!defined $args{URL}) {
-        croak("URL is required.\n");
-        return -1;
+    # override with anything passed in
+    for my $key (keys %{$args}) {
+        my $lc_key = lc($key);
+        $lc_key = 'username' if $lc_key eq 'user';
+        $lc_key = 'server' if $lc_key eq 'base';
+        next unless grep {$lc_key eq $_} @{$attrs};
+        $href->{$lc_key} = $args->{$key};
     }
-    $args{format} ||= 'json';
-    if (!$self->{SIGNATURE}) {
-        $self->{response} = $self->{browser}->post(
-            $self->{BASE} . '/yourls-api.php',
-            [
-                'shorturl' => $args{URL},
-                'action'   => 'expand',
-                'username' => $self->{USER},
-                'password' => $self->{PASSWORD},
-                'format'   => $args{format}
-            ]
-        );
-    }
-    else {
-        $self->{response} = $self->{browser}->post(
-            $self->{BASE} . '/yourls-api.php',
-            [
-                'shorturl'  => $args{URL},
-                'action'    => 'expand',
-                'signature' => $self->{SIGNATURE},
-                'format'    => $args{format}
-            ]
-        );
-    }
-    $self->{response}->is_success
-        || die 'Failed to get yourls.org link: '
-        . $self->{response}->status_line;
-    $self->{longurl}
-        = $self->{json}->jsonToObj($self->{response}->{_content})->{longurl}
-        if (
-        defined $self->{json}->jsonToObj($self->{response}->{_content})
-        ->{statusCode}
-        && $self->{json}->jsonToObj($self->{response}->{_content})->{statusCode}
-        == 200);
-    return $self->{longurl};
+    my $server = $href->{server} ? $href->{server} : 'https://yourls.org/yourls-api.php';
+    my $self = bless $href, $class;
+    return $self->server($server);
 }
 
 sub clicks {
     my $self = shift;
-    my %args = @_;
-    $args{URL} ||= $self->{url};
-    if (!defined $args{URL}) {
-        croak("URL is required.\n");
-        return -1;
-    }
-    if (!$self->{SIGNATURE}) {
-        $self->{response} = $self->{browser}->post(
-            $self->{BASE} . '/yourls-api.php',
-            [
-                'action'   => 'url-stats',
-                'format'   => 'json',
-                'shorturl' => $args{URL},
-                'username' => $self->{USER},
-                'password' => $self->{PASSWORD},
-            ]
-        );
+    Carp::croak("You must tell us which server to use.") unless my $server = $self->server();
+
+    my $args = _parse_args(@_);
+    my $short_url = $args->{shortUrl} || $args->{single_arg} || $args->{URL} || $args->{url} || '';
+    Carp::croak("A shortUrl parameter is required.\n") unless $short_url;
+
+    my $url = $server->clone();
+    my $params = {
+        shorturl => $short_url,
+        format => 'json',
+        action => 'url-stats',
+    };
+    if (my $sig = $self->signature()) {
+        $params->{signature} = $sig;
     }
     else {
-        $self->{response}
-            = $self->{browser}->get($self->{BASE}
-                . '/yourls-api.php?action=url-stats&format=json&shorturl='
-                . $args{URL}
-                . '&signature='
-                . $self->{SIGNATURE});
+        my $user = $self->username();
+        my $pass = $self->password();
+        unless ($user && $pass) {
+            Carp::croak("Username and password required when not using a signature");
+        }
+        $params->{username} = $user;
+        $params->{password} = $pass;
     }
-    $self->{response}->is_success
-        || die 'Failed to get yourls.org link: '
-        . $self->{response}->status_line;
-    if (
-        defined $self->{json}->jsonToObj($self->{response}->{_content})
-        ->{statusCode}
-        && $self->{json}->jsonToObj($self->{response}->{_content})->{statusCode}
-        == 200)
-    {
-        $self->{$args{URL}}->{clicks}
-            = $self->{json}->jsonToObj($self->{response}->{_content})->{link}
-            ->{clicks};
-        $self->{$args{URL}}->{info}
-            = $self->{json}->jsonToObj($self->{response}->{_content});
-    }
-    return $self->{$args{URL}};
+    $url->query_form(%$params);
+    return _json_request($url);
 }
 
-sub errors {
+sub expand {
     my $self = shift;
-    if (!$self->{SIGNATURE}) {
-        $self->{response} = $self->{browser}->post($self->{BASE} . '/errors',
-            ['username' => $self->{USER}, 'password' => $self->{PASSWORD},]);
+    Carp::croak("You must tell us which server to use.") unless my $server = $self->server();
+
+    my $args = _parse_args(@_);
+    my $short_url = $args->{shortUrl} || $args->{single_arg} || $args->{URL} || $args->{url} || '';
+    Carp::croak("A shortUrl parameter is required.\n") unless $short_url;
+
+    my $url = $server->clone();
+    my $params = {
+        shorturl => $short_url,
+        format => 'json',
+        action => 'expand',
+    };
+    if (my $sig = $self->signature()) {
+        $params->{signature} = $sig;
     }
     else {
-        $self->{response} = $self->{browser}->post($self->{BASE} . '/errors',
-            ['signature' => $self->{SIGNATURE},]);
+        my $user = $self->username();
+        my $pass = $self->password();
+        unless ($user && $pass) {
+            Carp::croak("Username and password required when not using a signature");
+        }
+        $params->{username} = $user;
+        $params->{password} = $pass;
     }
-    $self->{response}->is_success
-        || die 'Failed to get yourls.org link: '
-        . $self->{response}->status_line;
-    $self->{$self->{url}}->{content}
-        = $self->{xml}->XMLin($self->{response}->{_content});
-    $self->{$self->{url}}->{errorCode}
-        = $self->{$self->{url}}->{content}->{errorCode};
-    if ($self->{$self->{url}}->{errorCode} == 0) {
-        $self->{$self->{url}}->{clicks}
-            = $self->{$self->{url}}->{content}->{results};
-        return $self->{$self->{url}}->{clicks};
-    }
-    else {
-        return;
-    }
+    $url->query_form(%$params);
+    return _json_request($url);
 }
 
-sub version { $WWW::Shorten::Yourls::VERSION; }
+sub makealongerlink {
+    my $self;
+    if ($_[0] && blessed($_[0]) && $_[0]->isa('WWW::Shorten::Yourls')) {
+        $self = shift;
+    }
+    my $url = shift or Carp::croak('No URL passed to makealongerlink');
+    $self ||= __PACKAGE__->new(@_);
+    my $res = $self->expand(shortUrl=>$url);
+    use Data::Dumper::Concise; warn Dumper $res;
+    return '' unless ref($res) eq 'HASH' and $res->{longurl};
+    return $res->{longurl};
+}
+
+sub makeashorterlink {
+    my $self;
+    if ($_[0] && blessed($_[0]) && $_[0]->isa('WWW::Shorten::Yourls')) {
+        $self = shift;
+    }
+    my $url = shift or Carp::croak('No URL passed to makeashorterlink');
+    $self ||= __PACKAGE__->new(@_);
+    my $res = $self->shorten(longUrl=>$url, @_);
+    return $res->{shorturl};
+}
+
+sub password { return shift->_attr('password', @_); }
+
+sub server {
+    my $self = shift;
+    return $self->{server} unless @_;
+    my $val = shift;
+    if (!defined($val) || $val eq '') {
+        $self->{server} = undef;
+        return $self;
+    }
+    elsif (blessed($val) && $val->isa('URI')) {
+        $self->{server} = $val->clone();
+        return $self;
+    }
+    elsif ($val && !ref($val)) {
+        $self->{server} = URI->new(_trim($val));
+        return $self;
+    }
+
+    Carp::croak("The server attribute must be set to a URI object");
+}
+
+sub shorten {
+    my $self = shift;
+    Carp::croak("You must tell us which server to use.") unless my $server = $self->server();
+
+    my $args = _parse_args(@_);
+    my $long_url = $args->{longUrl} || $args->{single_arg} || $args->{URL} || $args->{url} || '';
+    Carp::croak("A longUrl parameter is required.\n") unless $long_url;
+
+    my $url = $server->clone();
+    my $params = {
+        url => $long_url,
+        format => 'json',
+        action => 'shorturl',
+    };
+    if (my $sig = $self->signature()) {
+        $params->{signature} = $sig;
+    }
+    else {
+        my $user = $self->username();
+        my $pass = $self->password();
+        unless ($user && $pass) {
+            Carp::croak("Username and password required when not using a signature");
+        }
+        $params->{username} = $user;
+        $params->{password} = $pass;
+    }
+    $url->query_form(%$params);
+    return _json_request($url);
+}
+
+sub signature { return shift->_attr('signature', @_); }
+
+sub username { return shift->_attr('username', @_); }
 
 1;   # End of WWW::Shorten::Yourls
 

@@ -21,6 +21,8 @@ on 'test' => sub {
     requires 'File::Spec';
     requires 'Path::Tiny';
     requires 'Test::More' => '0.88';
+    requires 'Try::Tiny'  => '0.24';
+    requires 'URI' => '1.58';
 };
 
 on 'develop' => sub {
