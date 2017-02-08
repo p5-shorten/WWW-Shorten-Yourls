@@ -314,131 +314,246 @@ WWW::Shorten::Yourls - Interface to shortening URLs using L<http://yourls.org>
 
 =head1 SYNOPSIS
 
-L<WWW::Shorten::Yourls> provides an easy interface for shortening URLs
-using L<http://yourls.org>. In addition to shortening URLs, you can pull
-statistics that L<http://yourls.org> gathers regarding each shortened URL.
+The traditional way, using the L<WWW::Shorten> interface:
 
-L<WWW::Shorten::Yourls> provides two interfaces. The first is the common
-C<makeashorterlink> and C<makealongerlink> that L<WWW::Shorten> provides.
-However, due to the way the L<http://yourls.org> API works, additional
-arguments are required. The second provides a better way of retrieving
-additional information and statistics about a URL.
+    use strict;
+    use warnings;
 
     use WWW::Shorten::Yourls;
+    # use WWW::Shorten 'Yourls';  # or, this way
 
-    my $url = "http://www.example.com";
+    # if you have a config file with your credentials:
+    my $short_url = makeashorterlink('http://www.foo.com/some/long/url');
+    my $long_url  = makealongerlink($short_url);
+    # otherwise
+    my $short = makeashorterlink('http://www.foo.com/some/long/url', {
+        username => 'username',
+        password => 'password',
+        server => 'https://yourls.org/yourls-api.php',
+        ...
+    });
 
-    my $tmp = makeashorterlink($url, 'MY_YOURLS_USERNAME', 'MY_YOURLS_PASSWORD');
-    my $tmp1 = makealongerlink($tmp, 'MY_YOURLS_USERNAME', 'MY_YOURLS_PASSWORD');
+Or, the Object-Oriented way:
 
-    # or
-
+    use strict;
+    use warnings;
+    use Data::Dumper;
+    use Try::Tiny qw(try catch);
     use WWW::Shorten::Yourls;
 
-    my $url = "http://www.example.com";
     my $yourls = WWW::Shorten::Yourls->new(
-        SIGNATURE => "my_api_key",
-        BASE      => 'myyourlsinstall.example.com',
+        username => 'username',
+        password => 'password',
+        signature => 'adflkdga234252lgka',
+        server => 'https://yourls.org/yourls-api.php', # default
     );
+    try {
+        my $res = $yourls->shorten(longUrl => 'http://google.com/');
+        say Dumper $res;
+        # {
+        #    message => "http://google.com/ added to database",
+        #    shorturl => "https://yourls.org/4",
+        #    status => "success",
+        #    statusCode => 200,
+        #    title => "Google",
+        #    url => {
+        #        date => "2017-02-08 02:34:37",
+        #        ip => "192.168.0.1",
+        #        keyword => 4,
+        #        title => "Google",
+        #        url => "http://google.com/"
+        #    }
+        # }
+    }
+    catch {
+        die("Oh, no! $_");
+    };
 
-    # or
+=head1 DESCRIPTION
 
-    my $yourls = WWW::Shorten::Yourls->new(
-        USER     => "my_user",
-        PASSWORD => "my_pass",
-        BASE     => 'myyourlsinstall.example.com',
-    );
+A Perl interface to the L<Yourls.org API|http://yourls.org/#API>.
 
-    $yourls->shorten(URL => $url);
-    print "shortened URL is $yourls->{url}\n";
-
-    $yourls->expand(URL => $yourls->{url});
-    print "expanded/original URL is $yourls->{longurl}\n";
+You can either use the traditional (non-OO) interface provided by L<WWW::Shorten>.
+Or, you can use the OO interface that provides you with more functionality.
 
 =head1 FUNCTIONS
 
-=head2 new
-
-Create a new instance object using your user id and API key.
-
-    my $yourls = WWW::Shorten::Yourls->new(
-        SIGNATURE => "my_api_key",
-        BASE      => 'myyourlsinstall.example.com',
-    );
-
-    # or
-
-    my $yourls = WWW::Shorten::Yourls->new(
-        USER     => "my_user",
-        PASSWORD => "my_pass",
-        BASE     => 'myyourlsinstall.example.com',
-    );
+In the non-OO form, L<WWW::Shorten::Yourls> makes the following functions available.
 
 =head2 makeashorterlink
 
-The function C<makeashorterlink> will call the API, passing it
-your long URL and will return the shorter version.
+    my $short_url = makeashorterlink('https://some_long_link.com');
+    # OR
+    my $short_url = makeashorterlink('https://some_long_link.com', {
+        username => 'foo',
+        password => 'bar',
+        # any other attribute can be set as well.
+    });
 
-A user id and password is required to shorten links.
+The function C<makeashorterlink> will call the L<Yourls Server|http://yourls.org> web site,
+passing it your long URL and will return the shorter version.
 
-    makeashorterlink($url,$uid,$passwd,$base);
+L<http://yourls.org> requires the use of a user account to shorten links.
 
 =head2 makealongerlink
+
+    my $long_url = makealongerlink('http://yourls.org/22');
+    # OR
+    my $long_url = makealongerlink('http://yourls.org/22', {
+        username => 'foo',
+        password => 'bar',
+        # any other attribute can be set as well.
+    });
 
 The function C<makealongerlink> does the reverse. C<makealongerlink>
 will accept as an argument either the full URL or just the identifier.
 
-A user name and API Key are required.
+If anything goes wrong, either function will die.
 
-If anything goes wrong, then the function will return C<undef>.
+=head1 ATTRIBUTES
 
-    makealongerlink($url,$uid,$passwd,$base);
+In the OO form, each L<WWW::Shorten::Yourls> instance makes the following
+attributes available.
 
-THIS IS NOT WORKING.
+=head2 password
 
-=head2 shorten
+    my $password = $yourls->password;
+    $yourls = $yourls->password('some_secret'); # method chaining
 
-Shorten a URL using L<http://yourls.org>. Calling the shorten method will
-return the shortened URL but will also store it in your object instance
-until the next call is made.
+Gets or sets the C<password>. This is used along with the
+L<WWW::Shorten::Yourls/username> attribute.  Credentials are sent to the server
+upon each and every request.
 
-    my $url = "http://www.example.com";
-    my $shortstuff = $yourls->shorten(URL => $url);
+=head2 server
 
-    print "yurl is " . $yourls->{url} . "\n";
-    # or
-    print "yurl is $shortstuff\n";
+    my $server = $yourls->server;
+    $yourls = $yourls->server(
+        URI->new('https://yourls.org/yourls-api.php')
+    ); # method chaining
 
-=head2 expand
+Gets or sets the C<server>. This is full and absolute path to the server and
+C<yourls-api.php> endpoint.
 
-Expands a shortened URL to the original long URL.
+=head2 signature
+
+    my $signature = $yourls->signature;
+    $signature = $yourls->signature('abcdef123'); # method chaining
+
+Gets or sets the C<signature>. If the C<signature> attribute is set, the
+L<WWW::Shorten::Yourls/userna,e> and L<WWW::Shorten::Yourls/password> attributes
+are ignored on each request and instead the C<signature> is sent.
+See the L<Password-less API|https://github.com/YOURLS/YOURLS/wiki/PasswordlessAPI>
+documentation for more details.
+
+=head2 username
+
+    my $username = $yourls->username;
+    $yourls = $yourls->username('my_username'); # method chaining
+
+Gets or sets the C<username>. This is used along with the
+L<WWW::Shorten::Yourls/password> attribute.  Credentials are sent to the server
+upon each and every request.
+
+=head1 METHODS
+
+In the OO form, L<WWW::Shorten::Yourls> makes the following methods available.
+
+=head2 new
+
+    my $yourls = WWW::Shorten::Yourls->new(
+        username => 'username',
+        password => 'password',
+        signature => 'adflkdga234252lgka',
+        server => 'https://yourls.org/yourls-api.php', # default
+    );
+
+The constructor can take any of the attributes above as parameters.
+
+Any or all of the attributes can be set in your configuration file. If you have
+a configuration file and you pass parameters to C<new>, the parameters passed
+in will take precedence.
 
 =head2 clicks
 
-Get click-through information for a shortened URL. By
-default, the method will use the value that's stored in
-C<< $yourls->{url} >>. To be sure you're getting info on the correct URL,
-it's a good idea to set this value before getting any info on it.
+    my $clicks = $yourls->clicks(shorturl => "https://yourls.org/5");
+    say Dumper $clicks;
+    # {
+    #    link => {
+    #        clicks => 0,
+    #        ip => "192.168.0.1",
+    #        shorturl => "http://yourls.org/5",
+    #        timestamp => "2017-02-08 02:37:24",
+    #        title => "Google",
+    #        url => "http://www.google.com"
+    #    },
+    #    message => "success",
+    #    statusCode => 200
+    # }
 
-THIS IS NOT WORKING.
+Get the C<url-stats> or number of C<clicks> for a given URL made shorter using
+the L<Yourls API|http://yourls.org/#API>.
+Returns a hash reference or dies. Make use of L<Try::Tiny>.
 
-=head2 errors
+=head2 expand
 
-THIS IS NOT WORKING.
+    my $long = $yourls->expand(shorturl => "https://yourls.org/5");
+    say $long->{longurl};
+    # http://www.google.com
+    say Dumper $long;
+    # {
+    #    keyword => 4,
+    #    longurl => "http://www.google.com",
+    #    message => "success",
+    #    shorturl => "http://jupiter/yourls/5",
+    #    statusCode => 200,
+    #    title => "Google"
+    # }
 
-=head2 version
+Expand a URL using the L<Yourls API|http://yourls.org/#API>.
+Returns a hash reference or dies. Make use of L<Try::Tiny>.
 
-Gets the module version number
+=head2 shorten
 
-=head1 FILES
+    my $short = $yourls->shorten(
+        url => "http://google.com/", # required.
+    );
+    say $short->{shorturl};
+    # https://yourls.org/4
+    say Dumper $short;
+    # {
+    #    message => "http://google.com/ added to database",
+    #    shorturl => "https://yourls.org/4",
+    #    status => "success",
+    #    statusCode => 200,
+    #    title => "Google",
+    #    url => {
+    #        date => "2017-02-08 02:34:37",
+    #        ip => "192.168.0.1",
+    #        keyword => 4,
+    #        title => "Google",
+    #        url => "http://google.com/"
+    #    }
+    # }
 
-$C<HOME/.yourls> or C<_yourls> on Windows Systems.
+Shorten a URL using the L<Yourls API|http://yourls.org/#API>.
+Returns a hash reference or dies. Make use of L<Try::Tiny>.
+
+=head1 CONFIG FILES
+
+C<$HOME/.yourls> or C<_yourls> on Windows Systems.
 
 You may omit C<USER> and C<PASSWORD> in the constructor if you set them in the
 C<.yourls> config file on separate lines using the syntax:
 
-  USER=username
-  PASSWORD=password
+  username=username
+  password=password
+  server=https://yourls.org/yourls-api.php
+  signature=foobarbaz123
+
+Set any or all L<WWW::Shorten::Yourls/ATTRIBUTES> in your config file in your
+home directory. Each C<key=val> setting should be on its own line. If any
+parameters are then passed to the L<WWW::Shorten::Yourls/new> constructor, those
+parameter values will take precedence over these.
 
 =head1 AUTHOR
 
@@ -460,23 +575,12 @@ Michiel Beijen <F<michielb@cpan.org>>
 
 =head1 LICENSE AND COPYRIGHT
 
-=over
-
-=item *
-
 Copyright (c) 2009 Pankaj Jain, All Rights Reserved L<http://blog.linosx.com>.
-
-=item *
 
 Copyright (c) 2009 Teknatus Solutions LLC, All Rights Reserved L<http://www.teknatus.com>.
 
-=back
 
 This program is free software; you can redistribute it and/or modify it
 under the same terms as Perl itself.
-
-=head1 SEE ALSO
-
-L<perl>, L<WWW::Shorten>, L<http://yourls.org>.
 
 =cut
