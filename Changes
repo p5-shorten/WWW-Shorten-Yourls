@@ -1,6 +1,9 @@
 Revision history for {{$dist->name}}
 
 {{$NEXT}}
+    - 
+
+1.000     2017-02-07
     - MAJOR CHANGES!!!!!
     - Cleaned up the object-oriented interface.
     - Removed errors function
