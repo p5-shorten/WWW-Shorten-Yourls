@@ -542,7 +542,7 @@ Returns a hash reference or dies. Make use of L<Try::Tiny>.
 
 C<$HOME/.yourls> or C<_yourls> on Windows Systems.
 
-You may omit C<USER> and C<PASSWORD> in the constructor if you set them in the
+You may omit C<username> and C<password> in the constructor if you set them in the
 C<.yourls> config file on separate lines using the syntax:
 
   username=username

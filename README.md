@@ -232,7 +232,7 @@ Returns a hash reference or dies. Make use of [Try::Tiny](https://metacpan.org/p
 
 `$HOME/.yourls` or `_yourls` on Windows Systems.
 
-You may omit `USER` and `PASSWORD` in the constructor if you set them in the
+You may omit `username` and `password` in the constructor if you set them in the
 `.yourls` config file on separate lines using the syntax:
 
     username=username
