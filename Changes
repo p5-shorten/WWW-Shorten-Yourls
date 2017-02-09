@@ -1,7 +1,7 @@
 Revision history for {{$dist->name}}
 
 {{$NEXT}}
-    - 
+    - Removed errant left-over debug code.
 
 1.000     2017-02-07
     - MAJOR CHANGES!!!!!

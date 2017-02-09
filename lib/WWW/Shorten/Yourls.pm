@@ -232,7 +232,6 @@ sub makealongerlink {
     my $url = shift or Carp::croak('No URL passed to makealongerlink');
     $self ||= __PACKAGE__->new(@_);
     my $res = $self->expand(shortUrl=>$url);
-    use Data::Dumper::Concise; warn Dumper $res;
     return '' unless ref($res) eq 'HASH' and $res->{longurl};
     return $res->{longurl};
 }
