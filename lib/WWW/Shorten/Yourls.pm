@@ -12,7 +12,7 @@ use URI ();
 
 use base qw( WWW::Shorten::generic Exporter );
 
-our $VERSION = '1.001';
+our $VERSION = '1.002';
 $VERSION = eval $VERSION;
 
 our @EXPORT = qw(new);
