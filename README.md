@@ -2,6 +2,8 @@
 
 WWW::Shorten::Yourls - Interface to shortening URLs using [http://yourls.org](http://yourls.org)
 
+This project isn't actively being maintained any longer due to changing priorities of the original creators and maintainers. If anyone would like to take over the project, please reach out.
+
 # SYNOPSIS
 
 The traditional way, using the [WWW::Shorten](https://metacpan.org/pod/WWW::Shorten) interface:
